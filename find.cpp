@@ -1,6 +1,7 @@
-#include <iostream>
+#include <stdio.h>
 #include <vector>
 #include <string>
+#include <stdexcept>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -98,7 +99,23 @@ intent parse_args(int argc, char *argv[]) {
     return res;
 }
 
+void print_usage() {
+    printf("Usage: find [path] [options]\n");
+    printf("Description: finds list of files, which satisfy predicate\n");
+    printf("Options list:\n");
+    printf("-size   [[-=+]number] : size in bytes\n");
+    printf("-nlinks [number]      : number of links allowed\n");
+    printf("-inum   [numer]       : number of inode\n");
+    printf("-name   [string]      : name of file\n");
+    printf("-exec   [path]        : path of executable, which will get output\n");
+}
+
 int main(int argc, char *argv[]) {
     intent user = parse_args(argc, argv);
-    std::cout << user.data << std::endl;
+    if (!user.good) {
+        printf("%s\n", user.data.data());
+        print_usage();
+        exit(EXIT_FAILURE);
+    }
+    exit(EXIT_SUCCESS);
 }
