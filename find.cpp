@@ -33,28 +33,31 @@ std::pair<string, size_t> convert(const string& str) {
 intent parse_args(int argc, char *argv[]) {
     intent res;
     if (argc <= 1 || (argc - 2) % 2 != 0) {
-        res.data = "Incorrect arguments";
+        res.data = "Incorrect number of arguments";
         return res;
     }
     string incorrect = "Incorrect value: ";
+    string for_flag = " for flag ";
     for (int i = 2; i < argc; i += 2) {
         string flag(argv[i]);
         string value(argv[i + 1]);
-        if (flag == "-inum") {
-            res.wants_inum = true;
-            auto temp = convert(value);
-            if (temp.first == "good") {
-                res.inum = temp.second;
-            } else {
-                res.data = incorrect + value + temp.first;
-                return res;
-            }
-        } else if (flag == "-name") {
+        if (flag == "-name") {
             res.wants_name = true;
             res.name = value;
+            continue;
+        }
+        if (flag == "-exec") {
+            res.wants_exec = true;
+            res.exec_path = value;
+            continue;
+        }
+        if (flag == "-inum") {
+            res.wants_inum = true;
+        } else if (flag == "-nlinks") {
+            res.wants_nlinks = true;
         } else if (flag == "-size") {
             if (value.length() <= 1) {
-                res.data = incorrect + value;
+                res.data = incorrect + value + for_flag + flag;
                 return res;
             }
             switch (value[0]) {
@@ -68,30 +71,25 @@ intent parse_args(int argc, char *argv[]) {
                     res.wants_size = greater;
                     break;
                 default:
-                    res.data = incorrect + value;
+                    res.data = incorrect + value + for_flag + flag;
                     return res;
             }
-            auto temp = convert(value.substr(1));
-            if (temp.first == "good") {
-                res.nlinks = temp.second;
-            } else {
-                res.data = incorrect + value + temp.first;
-                return res;
-            }
-        } else if (flag == "-nlinks") {
-            res.wants_nlinks = true;
-            auto temp = convert(value);
-            if (temp.first == "good") {
-                res.nlinks = temp.second;
-            } else {
-                res.data = incorrect + value + temp.first;
-                return res;
-            }
-        } else if (flag == "-exec") {
-            res.wants_exec = true;
-            res.exec_path = value;
+            value = value.substr(1);
         } else {
             res.data = "Incorrect option: " + flag;
+            return res;
+        }
+        auto temp = convert(value);
+        if (temp.first == "good") {
+            if (flag == "-inum") {
+                res.inum = temp.second;
+            } else if (flag == "-nlinks") {
+                res.nlinks = temp.second;
+            } else {
+                res.size = temp.second;
+            } 
+        } else {
+            res.data = incorrect + value + temp.first + for_flag + flag;
             return res;
         }
     }
