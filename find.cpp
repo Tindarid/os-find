@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
 
-using std::vector;
 using std::string;
 
 enum size_intent {no, lower, equal, greater};
@@ -103,11 +103,56 @@ void print_usage() {
     printf("Usage: find [path] [options]\n");
     printf("Description: finds list of files, which satisfy predicate\n");
     printf("Options list:\n");
-    printf("-size   [[-=+]number] : size in bytes\n");
+    printf("-size   [[-=+]number] : size in bytes (lower, equal, greater)\n");
     printf("-nlinks [number]      : number of links allowed\n");
-    printf("-inum   [numer]       : number of inode\n");
+    printf("-inum   [number]      : number of inode\n");
     printf("-name   [string]      : name of file\n");
     printf("-exec   [path]        : path of executable, which will get output\n");
+}
+
+std::vector<string> resolve(const intent& user) {
+    std::vector<string> res;
+    DIR* dir = opendir(user.data.data());
+    if (dir == NULL) {
+        perror("");
+        exit(EXIT_FAILURE);
+    }
+    while (true) {
+        errno = 0;
+        dirent* next = readdir(dir);
+        if (next == NULL) {
+            if (errno != 0) {
+                perror("");
+                exit(EXIT_FAILURE);
+            }
+            return res;
+        }
+        bool flag = true;
+        string path(next->d_name);
+        if (user.wants_inum) {
+            flag &= next->d_ino == user.inum;
+        }
+        if (user.wants_name) {
+            //flag &= path == user.name;
+        }
+        if (user.wants_nlinks) {
+            //flag &= next->d_ino == user.inum;
+        }
+        switch (user.wants_size) {
+            case lower:
+                break;
+            case equal:
+                break;
+            case greater:
+                break;
+            case no:
+            default:
+                break;
+        }
+        if (flag) {
+            res.push_back(path);
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -116,6 +161,14 @@ int main(int argc, char *argv[]) {
         printf("%s\n", user.data.data());
         print_usage();
         exit(EXIT_FAILURE);
+    }
+    auto list = resolve(user);
+    if (user.wants_exec) {
+
+    } else {
+        for (auto&& entry : list) {
+            printf("%s\n", entry.data());
+        }
     }
     exit(EXIT_SUCCESS);
 }
