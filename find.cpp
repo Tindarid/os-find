@@ -193,6 +193,21 @@ std::vector<string> bfs(const intent& user) {
     return res;
 }
 
+void exec(const string& executable, const std::vector<string>& args) {
+    size_t n = args.size();
+    char** c_args = new char*[n + 2];
+    c_args[0] = const_cast<char*>(executable.c_str());
+    for (size_t i = 1; i <= n; ++i) {
+        c_args[i] = const_cast<char*>(args[i - 1].c_str());
+    }
+    c_args[n + 1] = NULL;
+    if (execve(c_args[0], c_args, {NULL}) == -1) {
+        perror(("While executing " + executable).data());
+        delete[] c_args;
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main(int argc, char *argv[]) {
     intent user = parse_args(argc, argv);
     if (!user.good) {
@@ -202,7 +217,7 @@ int main(int argc, char *argv[]) {
     }
     auto list = bfs(user);
     if (user.wants_exec) {
-
+        exec(user.exec_path, list);
     } else {
         for (auto&& entry : list) {
             printf("%s\n", entry.data());
