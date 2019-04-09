@@ -111,7 +111,7 @@ void print_usage() {
     printf("-exec   [path]        : path of executable, which will get output\n");
 }
 
-void fill_queue(std::queue<string> &q, string d) {
+void fill_queue(std::queue<std::pair<string, string>> &q, string d) {
     if (d.back() != '/') {
         d += "/";
     }
@@ -134,7 +134,7 @@ void fill_queue(std::queue<string> &q, string d) {
         if (path == "." || path == "..") {
             continue;
         }
-        q.push(d + path);
+        q.push({d + path, path});
     }
     if (closedir(dir) != 0) {
         perror("");
@@ -147,7 +147,7 @@ bool check(const struct stat& sb, const intent& user, const string& name) {
         flag &= sb.st_ino == user.inum;
     }
     if (user.wants_name) {
-        //flag &= path == user.name;
+        flag &= name == user.name;
     }
     if (user.wants_nlinks) {
         flag &= sb.st_nlink == user.nlinks;
@@ -162,7 +162,6 @@ bool check(const struct stat& sb, const intent& user, const string& name) {
         case greater:
             flag &= (sb.st_size > user.size);
             break;
-        case no:
         default:
             break;
     }
@@ -171,22 +170,24 @@ bool check(const struct stat& sb, const intent& user, const string& name) {
 
 std::vector<string> bfs(const intent& user) {
     std::vector<string> res;
-    std::queue<string> q;
-    q.push(user.data);
+    std::queue<std::pair<string, string>> q;
+    q.push({user.data, user.data});
     struct stat sb;
     while (!q.empty()) {
-        string cur = q.front();
+        auto cur = q.front();
         q.pop();
-        auto data = cur.data();
+        auto path = cur.first;
+        auto name = cur.second;
+        auto data = path.data();
         if (lstat(data, &sb) == -1) {
             perror(data);
             continue;
         }
-        if (check(sb, user, cur)) {
-            res.push_back(cur);
+        if (check(sb, user, name)) {
+            res.push_back(path);
         }
         if ((sb.st_mode & S_IFMT) == S_IFDIR) {
-            fill_queue(q, cur);
+            fill_queue(q, path);
         }
     }
     return res;
