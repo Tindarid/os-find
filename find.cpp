@@ -110,9 +110,8 @@ void print_usage() {
     printf("-exec   [path]        : path of executable, which will get output\n");
 }
 
-std::vector<string> resolve(const intent& user) {
-    std::vector<string> res;
-    DIR* dir = opendir(user.data.data());
+void resolve(const intent& user, std::vector<string>& res, string root) {
+    DIR* dir = opendir(root.data());
     if (dir == NULL) {
         perror("");
         exit(EXIT_FAILURE);
@@ -125,10 +124,14 @@ std::vector<string> resolve(const intent& user) {
                 perror("");
                 exit(EXIT_FAILURE);
             }
-            return res;
+            break;
         }
         bool flag = true;
         string path(next->d_name);
+        if (path == "." || path == "..") {
+            continue;
+        }
+        /*
         if (user.wants_inum) {
             flag &= next->d_ino == user.inum;
         }
@@ -149,8 +152,13 @@ std::vector<string> resolve(const intent& user) {
             default:
                 break;
         }
+        */
+        string new_path = root + "/" + path;
         if (flag) {
-            res.push_back(path);
+            res.push_back(new_path);
+        }
+        if (next->d_type == DT_DIR) {
+            resolve(user, res, new_path);
         }
     }
 }
@@ -162,7 +170,8 @@ int main(int argc, char *argv[]) {
         print_usage();
         exit(EXIT_FAILURE);
     }
-    auto list = resolve(user);
+    std::vector<string> list;
+    resolve(user, list, user.data);
     if (user.wants_exec) {
 
     } else {
