@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <vector>
 #include <string>
+#include <queue>
 #include <stdexcept>
 
 #include <sys/types.h>
@@ -110,11 +111,15 @@ void print_usage() {
     printf("-exec   [path]        : path of executable, which will get output\n");
 }
 
-void resolve(const intent& user, std::vector<string>& res, string root) {
-    DIR* dir = opendir(root.data());
+void fill_queue(std::queue<string> &q, string d) {
+    if (d.back() != '/') {
+        d += "/";
+    }
+    auto data = d.data();
+    DIR* dir = opendir(data);
     if (dir == NULL) {
-        perror("");
-        exit(EXIT_FAILURE);
+        perror(data);
+        return;
     }
     while (true) {
         errno = 0;
@@ -122,45 +127,69 @@ void resolve(const intent& user, std::vector<string>& res, string root) {
         if (next == NULL) {
             if (errno != 0) {
                 perror("");
-                exit(EXIT_FAILURE);
             }
             break;
         }
-        bool flag = true;
         string path(next->d_name);
         if (path == "." || path == "..") {
             continue;
         }
-        /*
-        if (user.wants_inum) {
-            flag &= next->d_ino == user.inum;
+        q.push(d + path);
+    }
+    if (closedir(dir) != 0) {
+        perror("");
+    }
+}
+
+bool check(const struct stat& sb, const intent& user, const string& name) {
+    bool flag = true;
+    if (user.wants_inum) {
+        flag &= sb.st_ino == user.inum;
+    }
+    if (user.wants_name) {
+        //flag &= path == user.name;
+    }
+    if (user.wants_nlinks) {
+        flag &= sb.st_nlink == user.nlinks;
+    }
+    switch (user.wants_size) {
+        case lower:
+            flag &= (sb.st_size < user.size);
+            break;
+        case equal:
+            flag &= (sb.st_size == user.size);
+            break;
+        case greater:
+            flag &= (sb.st_size > user.size);
+            break;
+        case no:
+        default:
+            break;
+    }
+    return flag;
+}
+
+std::vector<string> bfs(const intent& user) {
+    std::vector<string> res;
+    std::queue<string> q;
+    q.push(user.data);
+    struct stat sb;
+    while (!q.empty()) {
+        string cur = q.front();
+        q.pop();
+        auto data = cur.data();
+        if (lstat(data, &sb) == -1) {
+            perror(data);
+            continue;
         }
-        if (user.wants_name) {
-            //flag &= path == user.name;
+        if (check(sb, user, cur)) {
+            res.push_back(cur);
         }
-        if (user.wants_nlinks) {
-            //flag &= next->d_ino == user.inum;
-        }
-        switch (user.wants_size) {
-            case lower:
-                break;
-            case equal:
-                break;
-            case greater:
-                break;
-            case no:
-            default:
-                break;
-        }
-        */
-        string new_path = root + "/" + path;
-        if (flag) {
-            res.push_back(new_path);
-        }
-        if (next->d_type == DT_DIR) {
-            resolve(user, res, new_path);
+        if ((sb.st_mode & S_IFMT) == S_IFDIR) {
+            fill_queue(q, cur);
         }
     }
+    return res;
 }
 
 int main(int argc, char *argv[]) {
@@ -170,8 +199,7 @@ int main(int argc, char *argv[]) {
         print_usage();
         exit(EXIT_FAILURE);
     }
-    std::vector<string> list;
-    resolve(user, list, user.data);
+    auto list = bfs(user);
     if (user.wants_exec) {
 
     } else {
